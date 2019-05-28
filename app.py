@@ -119,7 +119,7 @@ class RootRequest(Resource):
 
 
 class GetUnitIds(Resource):
-#    @jwt_required()
+    @jwt_required()
     def get(self):
         global queries
         try:
@@ -140,7 +140,7 @@ class GetUnitIds(Resource):
 
 
 class GetDocuments(Resource):
-#    @jwt_required()
+    @jwt_required()
     def get(self):
         global queries
         try:

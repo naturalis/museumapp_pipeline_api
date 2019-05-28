@@ -32,9 +32,13 @@ class elasticsearch_init:
 
  
     def delete_index(self):
-        result = self.es.indices.delete(index=self.index_name)
-        print(result)
-        print("index deleted")
+        print("deleting index")
+        try:
+            result = self.es.indices.delete(index=self.index_name)
+            print(result)
+            print("index deleted")
+        except Exception as e:
+            print(e)
 
 
     def create_index_from_file(self, mapping_file):
@@ -69,6 +73,6 @@ if __name__ == '__main__':
     e.set_index_name('museumapp')
     e.check_availability()
     e.delete_index()
-    e.create_index_from_file('es_mapping.json')
-    e.load_documents_from_folder('./documents')
+    e.create_index_from_file('test_es_mapping.json')
+    e.load_documents_from_folder('./test_documents')
 
