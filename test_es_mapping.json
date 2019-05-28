@@ -1,0 +1,13 @@
+{
+  "mappings": {
+    "properties": { 
+      "title":    { "type": "text"  }, 
+      "label":    { "type": "text"  }, 
+      "object_id":     { "type": "text"  }, 
+      "created":  {
+        "type":   "date", 
+        "format": "yyyy-MM-dd HH:mm:ss"
+      }
+    }
+  }
+}
