@@ -26,12 +26,11 @@ def initialize(app):
     initialize_users()
     initialize_elasticsearch()
 
-def initialize_logger(log_dir="./",log_level=logging.INFO,log_to_stdout=True):
+def initialize_logger(log_level=logging.INFO,log_to_stdout=True):
     global logger
-    logger=logging.getLogger("MuseumApp API")
+    logger=logging.getLogger("API")
     logger.setLevel(log_level)
-    # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     fh = logging.FileHandler(os.getenv('LOGFILE_PATH'))
     fh.setLevel(log_level)
