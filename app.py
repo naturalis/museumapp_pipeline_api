@@ -11,6 +11,7 @@ api = Api(app, prefix="/api")
 
 USERS = []
 ES_INDEX = None
+ES_CONTROL_INDEX = None
 
 service_available = True
 logger = None
@@ -58,7 +59,7 @@ def initialize_users():
         USERS.append({ "username" : os.getenv('API_USER'), "password" : os.getenv('API_PASS'), "userid" : os.getenv('API_USERID')})
 
 def initialize_elasticsearch():
-    global es, ES_INDEX, logger
+    global logger, es, ES_INDEX, ES_CONTROL_INDEX
     try:
         if (os.getenv('ES_PORT')==None):
             logger.error("ES_PORT missing from ENV")
@@ -69,8 +70,12 @@ def initialize_elasticsearch():
         if (os.getenv('ES_INDEX')==None):
             logger.error("ES_INDEX missing from ENV")
             set_service_available(False)
+        if (os.getenv('ES_CONTROL_INDEX')==None):
+            logger.error("ES_CONTROL_INDEX missing from ENV")
+            set_service_available(False)
         else:
             ES_INDEX = os.getenv('ES_INDEX')
+            ES_CONTROL_INDEX = os.getenv('ES_CONTROL_INDEX')
 
         es = Elasticsearch([{'host': os.getenv('ES_HOST'), 'port': os.getenv('ES_PORT')}])
         es.info()
@@ -118,7 +123,7 @@ class RootRequest(Resource):
 
 
 class GetUnitIds(Resource):
-    @jwt_required()
+    # @jwt_required()
     def get(self):
         global queries
         try:
@@ -139,7 +144,7 @@ class GetUnitIds(Resource):
 
 
 class GetDocuments(Resource):
-    @jwt_required()
+    # @jwt_required()
     def get(self):
         global queries
         try:
@@ -170,11 +175,23 @@ def run_elastic_query(query,**kwargs):
     return es.search(index=ES_INDEX,body=query,**kwargs)
 
 
+def get_documents_status():
+    global es, ES_CONTROL_INDEX
+    response = es.search(index=ES_CONTROL_INDEX,body='{}')
+    try:
+        documents_status=response["hits"]["hits"][0]["_source"]["status"]
+    except Exception as e:
+        log_request_error("document status unavailable (defaulting to 'ready')")
+        documents_status="ready"
+    return documents_status
+
+
 def process_response(response):
-    hits=[]
+    items=[]
     for item in response["hits"]["hits"]:
-        hits.append(item["_source"])
-    return hits
+        items.append(item["_source"])
+
+    return { "size" : len(items), "items" : items }
 
 
 def log_usage(query,hits):
@@ -188,9 +205,11 @@ def log_request_error(error):
     logger.error(json.dumps({ "endpoint" : endpoint, "error" : error }))
 
 
-
 @app.before_request
 def PreRequestHandler():
+    if not get_documents_status() == "ready":
+        return '{ "error": "document store busy" }'
+
     if get_service_available() == False:
         log_request_error("service unavailable")
         return '{ "error": "service unavailable" }'
@@ -216,8 +235,4 @@ initialize(app)
 
 if __name__ == '__main__':
     app.run(debug=True,host='0.0.0.0')
-
-
-# TODO
-# - error handlers for codes other than 404
 

@@ -1,5 +1,4 @@
-import os, json, sys, logging
-
+import os, json, sys, logging, datetime
 from elasticsearch import Elasticsearch
 
 class elasticsearch_access:
@@ -104,6 +103,16 @@ class elasticsearch_access:
         self.logger.info(json.dumps(result))
 
 
+    def set_documents_status(self,state):
+        doc = '{{  "status": "{}", "created":  "{}" }}'
+
+        if state in [ "busy", "ready" ]:
+            date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            query = doc.format(state, date)
+            result = self.es.index(index=self.index_name, id="1", body=query)
+            self.logger.info("set documents state '{}'".format(state))
+
+
 if __name__ == '__main__':
     e = elasticsearch_access()
     e.initialize()
@@ -116,13 +125,29 @@ if __name__ == '__main__':
 
     e.check_availability()
 
-    if len(sys.argv)> 2 and sys.argv[1]=='create_index' and not sys.argv[2]==None:
-        e.create_index_from_file(sys.argv[2])
-    elif len(sys.argv)> 1 and sys.argv[1]=='delete_index':
+    if not os.getenv('ES_CONTROL_COMMAND')==None:
+        ES_CONTROL_COMMAND=os.getenv('ES_CONTROL_COMMAND')
+    else:
+        ES_CONTROL_COMMAND=None
+
+    if not os.getenv('ES_CONTROL_ARGUMENT')==None:
+        ES_CONTROL_ARGUMENT=os.getenv('ES_CONTROL_ARGUMENT')
+    else:
+        ES_CONTROL_ARGUMENT=None
+
+    if ES_CONTROL_COMMAND=='create_index' and not ES_CONTROL_ARGUMENT==None:
+        e.create_index_from_file(ES_CONTROL_ARGUMENT)
+    elif ES_CONTROL_COMMAND=='delete_index':
         e.delete_index()
-    elif len(sys.argv)> 2 and sys.argv[1]=='load_documents' and not sys.argv[2]==None:
-        e.load_documents_from_folder(sys.argv[2])
-    elif len(sys.argv)> 2 and sys.argv[1]=='delete_document' and not sys.argv[2]==None:
-        e.delete_document_by_id(sys.argv[2])
-    elif len(sys.argv)> 1 and sys.argv[1]=='delete_documents':
+    elif ES_CONTROL_COMMAND=='load_documents' and not ES_CONTROL_ARGUMENT==None:
+        e.load_documents_from_folder(ES_CONTROL_ARGUMENT)
+    elif ES_CONTROL_COMMAND=='delete_document' and not ES_CONTROL_ARGUMENT==None:
+        e.delete_document_by_id(ES_CONTROL_ARGUMENT)
+    elif ES_CONTROL_COMMAND=='delete_documents':
         e.delete_documents_by_query()
+    elif ES_CONTROL_COMMAND=='set_documents_status' and not ES_CONTROL_ARGUMENT==None:
+        if (os.getenv('ES_CONTROL_INDEX')==None):
+            e.logger.error("ES_CONTROL_INDEX missing from ENV")
+        else:
+            e.set_index_name(os.getenv('ES_CONTROL_INDEX'))
+            e.set_documents_status(ES_CONTROL_ARGUMENT)
