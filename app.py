@@ -29,6 +29,10 @@ def initialize(app):
 
 def initialize_logger(log_level=logging.INFO):
     global logger
+
+    if os.getenv('DEBUGGING')=="1":
+        log_level=logging.DEBUG
+
     logger=logging.getLogger("API")
     logger.setLevel(log_level)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -38,14 +42,11 @@ def initialize_logger(log_level=logging.INFO):
     fh.setFormatter(formatter)
     logger.addHandler(fh)
     
-    try:
-        if True or os.getenv('FLASK_DEBUG')=="1":
-            ch = logging.StreamHandler()
-            ch.setLevel(log_level)
-            ch.setFormatter(formatter)
-            logger.addHandler(ch)
-    except Exception as e:
-        pass
+    if os.getenv('DEBUGGING')=="1":
+        ch = logging.StreamHandler()
+        ch.setLevel(log_level)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
 
 def initialize_users():
     global USERS, logger

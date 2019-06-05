@@ -1,37 +1,35 @@
 import os, json, sys, logging, datetime
 from elasticsearch import Elasticsearch
 
-class elasticsearch_access:
+class elasticsearch_control:
+
+    debug = False
     es_host = None
     es_port = None
     es = None
     index_name = None
+    control_index_name = None
     logfile_path = None
     logger = None
+    control_command = None
+    control_argument = None
 
     def initialize(self):
+        self.set_debug(os.getenv('DEBUGGING')=="1")
 
-        if (os.getenv('ES_HOST')==None):
-            raise ValueError('ES_HOST not set in ENV')
-        else:
-            self.es_host=os.getenv('ES_HOST')
+        for item in [ "ES_INDEX", "ES_CONTROL_INDEX", "ES_HOST", "ES_PORT", "LOGFILE_PATH" ]:
+            if (os.getenv(item)==None):
+                raise ValueError("'{}' not set in ENV".format(item))
 
-        if (os.getenv('ES_PORT')==None):
-            raise ValueError('ES_PORT not set in ENV')
-        else:
-            self.es_port=os.getenv('ES_PORT')
-
-        if (os.getenv('LOGFILE_PATH')==None):
-            raise ValueError('LOGFILE_PATH not set in ENV')
-        else:
-            self.logfile_path=os.getenv('LOGFILE_PATH')
-
-        self.es = Elasticsearch([{'host': self.es_host, 'port': self.es_port}])
+        self.initialize_logger(log_level=logging.DEBUG if self.get_debug() else logging.INFO)
+        self.initialize_elastic()
 
 
-    def initialize_logger(self,log_dir="./",log_level=logging.INFO,log_to_stdout=True):
+    def initialize_logger(self,log_level=logging.INFO):
+        self.logfile_path=os.getenv('LOGFILE_PATH')
         self.logger=logging.getLogger("loader")
         self.logger.setLevel(log_level)
+
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
         fh = logging.FileHandler(self.logfile_path)
@@ -39,17 +37,34 @@ class elasticsearch_access:
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
         
-        if log_to_stdout:
+        if self.get_debug():
             ch = logging.StreamHandler()
             ch.setLevel(log_level)
             ch.setFormatter(formatter)
             self.logger.addHandler(ch)
-
  
-    def set_index_name(self,name):
-        self.index_name = name
 
+    def initialize_elastic(self):
+        self.es_host=os.getenv('ES_HOST')
+        self.es_port=os.getenv('ES_PORT')
+        self.index_name = os.getenv('ES_INDEX')
+        self.control_index_name = os.getenv('ES_CONTROL_INDEX')
+        self.es = Elasticsearch([{'host': self.es_host, 'port': self.es_port}])
+
+        self.logger.debug("elastic host: {}".format(self.es_host))
+        self.logger.debug("elastic port: {}".format(self.es_port))
+        self.logger.debug("elastic index: {}".format(self.index_name))
+        self.logger.debug("elastic control index: {}".format(self.control_index_name))
  
+
+    def set_debug(self,state):
+        self.debug=state
+
+
+    def get_debug(self):
+        return self.debug
+
+
     def check_availability(self):
         try:
             self.es.info()
@@ -58,20 +73,21 @@ class elasticsearch_access:
             self.logger.error("elasticsearch unavailable")
 
  
-    def delete_index(self):
+    def delete_index(self,index):
         try:
-            result = self.es.indices.delete(index=self.index_name)
+            result = self.es.indices.delete(index=index)
             self.logger.info(json.dumps(result))
         except Exception as e:
             self.logger.error(e)
 
 
-    def create_index_from_file(self,mapping_file):
+    def create_index_from_file(self,mapping_file,index):
         try:
             with open(mapping_file, 'r') as file:
-                body = file.read().replace('\n', ' ')
+                # doc = file.read().replace('\n', ' ')
+                doc = json.loads(file.read())
 
-            result = self.es.indices.create(index=self.index_name,body=body)
+            result = self.es.indices.create(index=index, body=doc)
             self.logger.info(json.dumps(result))
         except Exception as e:
             self.logger.error(e)
@@ -82,15 +98,17 @@ class elasticsearch_access:
         failed = 0
         for filename in os.listdir(folder):
             if filename.endswith(".json"):
-                f = open(os.path.join(folder,filename))
-                doc = json.loads(f.read())
+                file = open(os.path.join(folder,filename))
+                doc = json.loads(file.read())
                 try:
                     result = self.es.index(index=self.index_name, id=doc["id"], body=doc, op_type='create')
-                    self.logger.info("loaded {}".format(filename))
+                    self.logger.info("loaded: {}".format(filename))
                     loaded += 1
                 except Exception as e:
-                    self.logger.error("error loading {}: {})".format(filename,e))
+                    self.logger.error("error loading: {} ({})".format(filename,e))
                     failed += 1
+
+        self.logger.info("finished loading: {}; successful {}, failed {}".format(folder,loaded,failed))
 
 
     def delete_document_by_id(self,doc_id):
@@ -109,45 +127,79 @@ class elasticsearch_access:
         if state in [ "busy", "ready" ]:
             date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             query = doc.format(state, date)
-            result = self.es.index(index=self.index_name, id="1", body=query)
-            self.logger.info("set documents state '{}'".format(state))
+            result = self.es.index(index=self.control_index_name, id="1", body=query)
+            self.logger.info("set documents state: {}".format(state))
+        else:
+            self.logger.warning("unknown state: {}".format(state))
+
+
+    def set_control_command(self,command):
+        if command in [ "create_index", "delete_index", "load_documents", 
+                        "delete_document", "delete_documents", "set_documents_status" ]:
+            self.control_command = command
+        else:
+            self.logger.warning("unknown control command: {}".format(command))
+
+
+    def set_control_argument(self,argument):
+        self.control_argument = argument
+
+
+    def run_control_command(self):
+        if self.control_command=='create_index' and not self.control_argument==None:
+            if not os.path.exists(self.control_argument):
+                self.logger.warning("file doesn't exist: {}".format(self.control_argument))
+            else:
+                self.logger.info("creating index from file: {}".format(self.control_argument))
+                self.create_index_from_file(self.control_argument,index=self.index_name)
+            return
+
+        if self.control_command=='delete_index':
+            self.logger.info("deleting index")
+            self.delete_index(index=self.index_name)
+            return
+
+        if self.control_command=='create_control_index' and not self.control_argument==None:
+            if not os.path.exists(self.control_argument):
+                self.logger.warning("file doesn't exist: {}".format(self.control_argument))
+            else:
+                self.logger.info("creating control index from file: {}".format(self.control_argument))
+                self.create_index_from_file(self.control_argument,index=self.control_index_name)
+            return
+
+        if self.control_command=='delete_control_index':
+            self.logger.info("deleting control index")
+            self.delete_index(index=self.control_index_name)
+            return
+
+        if self.control_command=='load_documents' and not self.control_argument==None:
+            if not os.path.exists(self.control_argument):
+                self.logger.warning("folder doesn't exist: {}".format(self.control_argument))
+            else:
+                self.logger.info("loading documents from folder: {}".format(self.control_argument))
+                self.load_documents_from_folder(self.control_argument)
+            return
+
+        if self.control_command=='delete_documents':
+            self.logger.info("deleting all documents")
+            self.delete_documents_by_query()
+            return
+
+        if self.control_command=='delete_document' and not self.control_argument==None:
+            self.logger.info("delete document by id: {}".format(self.control_argument))
+            self.delete_document_by_id(self.control_argument)
+            return
+
+        if self.control_command=='set_documents_status' and not self.control_argument==None:
+            self.set_documents_status(self.control_argument)
+            return
 
 
 if __name__ == '__main__':
-    e = elasticsearch_access()
+
+    e = elasticsearch_control()
     e.initialize()
-    e.initialize_logger()
-    
-    if (os.getenv('ES_INDEX')==None):
-        e.logger.error("ES_INDEX missing from ENV")
-    else:
-        e.set_index_name(os.getenv('ES_INDEX'))
-
     e.check_availability()
-
-    if not os.getenv('ES_CONTROL_COMMAND')==None:
-        ES_CONTROL_COMMAND=os.getenv('ES_CONTROL_COMMAND')
-    else:
-        ES_CONTROL_COMMAND=None
-
-    if not os.getenv('ES_CONTROL_ARGUMENT')==None:
-        ES_CONTROL_ARGUMENT=os.getenv('ES_CONTROL_ARGUMENT')
-    else:
-        ES_CONTROL_ARGUMENT=None
-
-    if ES_CONTROL_COMMAND=='create_index' and not ES_CONTROL_ARGUMENT==None:
-        e.create_index_from_file(ES_CONTROL_ARGUMENT)
-    elif ES_CONTROL_COMMAND=='delete_index':
-        e.delete_index()
-    elif ES_CONTROL_COMMAND=='load_documents' and not ES_CONTROL_ARGUMENT==None:
-        e.load_documents_from_folder(ES_CONTROL_ARGUMENT)
-    elif ES_CONTROL_COMMAND=='delete_document' and not ES_CONTROL_ARGUMENT==None:
-        e.delete_document_by_id(ES_CONTROL_ARGUMENT)
-    elif ES_CONTROL_COMMAND=='delete_documents':
-        e.delete_documents_by_query()
-    elif ES_CONTROL_COMMAND=='set_documents_status' and not ES_CONTROL_ARGUMENT==None:
-        if (os.getenv('ES_CONTROL_INDEX')==None):
-            e.logger.error("ES_CONTROL_INDEX missing from ENV")
-        else:
-            e.set_index_name(os.getenv('ES_CONTROL_INDEX'))
-            e.set_documents_status(ES_CONTROL_ARGUMENT)
+    e.set_control_command(os.getenv('ES_CONTROL_COMMAND') if not os.getenv('ES_CONTROL_COMMAND')==None else None)
+    e.set_control_argument(os.getenv('ES_CONTROL_ARGUMENT') if not os.getenv('ES_CONTROL_ARGUMENT')==None else None)
+    e.run_control_command()
