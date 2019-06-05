@@ -1,9 +1,9 @@
 from flask import Flask
 from flask_restful import Resource, Api, reqparse, request
 from flask_jwt import JWT, jwt_required
-import logging, os, json
 from datetime import datetime
 from elasticsearch import Elasticsearch
+import logging, os, json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('JWT_KEY')
@@ -27,7 +27,7 @@ def initialize(app):
     initialize_users()
     initialize_elasticsearch()
 
-def initialize_logger(log_level=logging.INFO,log_to_stdout=True):
+def initialize_logger(log_level=logging.INFO):
     global logger
     logger=logging.getLogger("API")
     logger.setLevel(log_level)
@@ -38,42 +38,40 @@ def initialize_logger(log_level=logging.INFO,log_to_stdout=True):
     fh.setFormatter(formatter)
     logger.addHandler(fh)
     
-    if log_to_stdout:
-        ch = logging.StreamHandler()
-        ch.setLevel(log_level)
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
+    try:
+        if True or os.getenv('FLASK_DEBUG')=="1":
+            ch = logging.StreamHandler()
+            ch.setLevel(log_level)
+            ch.setFormatter(formatter)
+            logger.addHandler(ch)
+    except Exception as e:
+        pass
 
 def initialize_users():
     global USERS, logger
-    if (os.getenv('API_USER')==None):
-        logger.error("API_USER missing from ENV")
-        set_service_available(False)
-    if (os.getenv('API_PASS')==None):
-        logger.error("API_PASS missing from ENV")
-        set_service_available(False)
-    if (os.getenv('API_USERID')==None):
-        logger.error("API_USERID missing from ENV")
-        set_service_available(False)
-    else:
-        USERS.append({ "username" : os.getenv('API_USER'), "password" : os.getenv('API_PASS'), "userid" : os.getenv('API_USERID')})
+
+    for item in [ 'API_USER', 'API_PASS', 'API_USERID' ]:
+        if (os.getenv(item)==None):
+            logger.error("{} missing from ENV".format(item))
+            set_service_available(False)
+
+    if get_service_available() == True:
+        USERS.append({
+            "username" : os.getenv('API_USER'),
+            "password" : os.getenv('API_PASS'),
+            "userid" : os.getenv('API_USERID')
+        })
+
 
 def initialize_elasticsearch():
     global logger, es, ES_INDEX, ES_CONTROL_INDEX
     try:
-        if (os.getenv('ES_PORT')==None):
-            logger.error("ES_PORT missing from ENV")
-            set_service_available(False)
-        if (os.getenv('ES_HOST')==None):
-            logger.error("ES_HOST missing from ENV")
-            set_service_available(False)
-        if (os.getenv('ES_INDEX')==None):
-            logger.error("ES_INDEX missing from ENV")
-            set_service_available(False)
-        if (os.getenv('ES_CONTROL_INDEX')==None):
-            logger.error("ES_CONTROL_INDEX missing from ENV")
-            set_service_available(False)
-        else:
+        for item in [ 'ES_PORT', 'ES_HOST', 'ES_INDEX', 'ES_CONTROL_INDEX' ]:
+            if (os.getenv(item)==None):
+                logger.error("{} missing from ENV".format(item))
+                set_service_available(False)
+
+        if get_service_available() == True:
             ES_INDEX = os.getenv('ES_INDEX')
             ES_CONTROL_INDEX = os.getenv('ES_CONTROL_INDEX')
 
@@ -82,6 +80,7 @@ def initialize_elasticsearch():
     except Exception as e:
         logger.error("elasticsearch unreachable: {}".format(str(e)))
         set_service_available(False)
+
 
 
 def set_service_available(state):
@@ -104,6 +103,7 @@ class User(object):
 
 def verify(username, password):
     global USERS
+
     if not (username and password):
         return False
 
@@ -119,11 +119,11 @@ def identity(payload):
 
 class RootRequest(Resource):
     def get(self):
-        return { "you've stumbled upon" : "naturalis museumapp pipeline api" }
+        return { "naturalis museumapp pipeline api" : "v1.0" }
 
 
-class GetUnitIds(Resource):
-    # @jwt_required()
+class GetDocumentIds(Resource):
+    @jwt_required()
     def get(self):
         global queries
         try:
@@ -144,7 +144,7 @@ class GetUnitIds(Resource):
 
 
 class GetDocuments(Resource):
-    # @jwt_required()
+    @jwt_required()
     def get(self):
         global queries
         try:
@@ -152,7 +152,7 @@ class GetDocuments(Resource):
             date = args['from']
             doc_id = args['id']
 
-            if not doc_id==None:
+            if not doc_id==None and not len(doc_id)==0:
                 doc_id = json.dumps(doc_id)
                 query = queries["doc_id"].format(doc_id)
             elif date==None:
@@ -227,12 +227,10 @@ parser.add_argument('from')
 parser.add_argument('id')
 
 api.add_resource(RootRequest, '/')
-api.add_resource(GetUnitIds, '/ids')
+api.add_resource(GetDocumentIds, '/ids')
 api.add_resource(GetDocuments, '/documents')
 
 initialize(app)
 
-
 if __name__ == '__main__':
-    app.run(debug=True,host='0.0.0.0')
-
+    app.run(debug=(os.getenv('FLASK_DEBUG')=="1"),host='0.0.0.0')
