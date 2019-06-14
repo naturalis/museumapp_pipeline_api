@@ -7,6 +7,7 @@ import logging, os, json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('JWT_KEY')
+app.config['PROPAGATE_EXCEPTIONS'] = True
 api = Api(app, prefix="/api")
 
 USERS = []
@@ -220,8 +221,15 @@ def PreRequestHandler():
 def page_not_found(e):
     return '{{ "error": "{}" }}'.format(e), 404
 
-
 jwt = JWT(app, verify, identity)
+
+@jwt.jwt_error_handler
+def customized_error_handler(error):
+    # print(error.error)
+    # print(error.description)
+    # print(error.status_code)
+    return '{{ "error" : "{}" }}'.format(error.error), error.status_code
+    # return '{{ "error": "{} ({})" }}'.format(error.error,error.description), error.status_code
 
 parser = reqparse.RequestParser()
 parser.add_argument('from')
