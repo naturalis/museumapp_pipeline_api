@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_restful import Resource, Api, reqparse, request
 from flask_jwt import JWT, jwt_required
 from datetime import datetime
@@ -124,6 +124,7 @@ class RootRequest(Resource):
         return { "naturalis museumapp pipeline api" : "v1.0" }
 
 
+@consumes('application/json', 'text/html')
 class GetDocumentIds(Resource):
     @jwt_required()
     def get(self):
@@ -210,26 +211,27 @@ def log_request_error(error):
 @app.before_request
 def PreRequestHandler():
     if not get_documents_status() == "ready":
-        return '{ "error": "document store busy" }'
+        return jsonify({ "error": "document store busy" })
 
     if get_service_available() == False:
         log_request_error("service unavailable")
-        return '{ "error": "service unavailable" }'
+        return jsonify({ "error": "service unavailable" })
 
 
 @app.errorhandler(404)
 def page_not_found(e):
-    return '{{ "error": "{}" }}'.format(e), 404
+    return jsonify({ "error" : e.description }), 404
+
 
 jwt = JWT(app, verify, identity)
 
 @jwt.jwt_error_handler
-def customized_error_handler(error):
-    # print(error.error)
-    # print(error.description)
-    # print(error.status_code)
-    return '{{ "error" : "{}" }}'.format(error.error), error.status_code
-    # return '{{ "error": "{} ({})" }}'.format(error.error,error.description), error.status_code
+def customized_error_handler(e):
+    # print(e.error)
+    # print(e.description)
+    # print(e.status_code)
+    return jsonify({ "error" : e.error }), e.status_code
+
 
 parser = reqparse.RequestParser()
 parser.add_argument('from')
