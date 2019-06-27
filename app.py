@@ -124,7 +124,6 @@ class RootRequest(Resource):
         return { "naturalis museumapp pipeline api" : "v1.0" }
 
 
-@consumes('application/json', 'text/html')
 class GetDocumentIds(Resource):
     @jwt_required()
     def get(self):
@@ -175,7 +174,7 @@ class GetDocuments(Resource):
 
 def run_elastic_query(query,**kwargs):
     global es, ES_INDEX
-    return es.search(index=ES_INDEX,body=query,**kwargs)
+    return es.search(index=ES_INDEX,body=query,size=9999,**kwargs)
 
 
 def get_documents_status():
