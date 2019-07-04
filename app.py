@@ -20,7 +20,8 @@ logger = None
 queries = {
     "all" : '{}',
     "date_range" : '{{ "query": {{ "range" : {{ "created" : {{ "gte" : "{}" }} }} }} }}',
-    "doc_id" : '{{ "query": {{ "match" : {{ "id" : {} }} }} }}'
+    # "doc_id" : '{{ "query": {{ "match" : {{ "id" : {} }} }} }}'
+    "key" : '{{ "query": {{ "match_phrase": {{ "key": {} }} }} }}'
 }
 
 def initialize(app):
@@ -124,46 +125,45 @@ class RootRequest(Resource):
         return { "naturalis museumapp pipeline api" : "v1.0" }
 
 
-class GetDocumentIds(Resource):
-    @jwt_required()
+
+class GetLastUpdated(Resource):
+    # @jwt_required()
     def get(self):
         global queries
         try:
-            args = parser.parse_args()
-            date = args['from']
-            if date==None:
-                query = queries["all"]
-            else:
-                datetime_object = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
-                query = queries["date_range"].format(datetime_object)
-            response = run_elastic_query(query,_source_includes="id,created")
+            query = queries["all"]
+            response = run_elastic_query(query,size=1,_source_includes="key,created")
             reduced = process_response(response)
-            log_usage(query=query,hits=len(reduced))
-            return reduced
+            return { "last_update_date" : reduced["items"][0]["created"] }
         except Exception as e:
             log_request_error(str(e))
-            return {"error": str(e) }
+            return { "error": str(e) }
 
 
 class GetDocuments(Resource):
-    @jwt_required()
+    # @jwt_required()
     def get(self):
         global queries
         try:
             args = parser.parse_args()
-            date = args['from']
-            doc_id = args['id']
+            key = args['key']
 
-            if not doc_id==None and not len(doc_id)==0:
-                doc_id = json.dumps(doc_id)
-                query = queries["doc_id"].format(doc_id)
-            elif date==None:
-                query = queries["all"]
+            # use language (nl,en) as filter in query 
+            # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-filter-context.html
+            language = args['language']
+            if not language:
+                language='nl'
+
+            if not language in ['en','nl']:
+                raise ValueError("unknown language '{}'".format(language))
+
+            if not key==None and not len(key)==0:
+                key = json.dumps(key)
+                query = queries["key"].format(key)
             else:
-                datetime_object = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
-                query = queries["date_range"].format(datetime_object)
+                query = queries["all"]
 
-            response = run_elastic_query(query)
+            response = run_elastic_query(query,size=9999)
             reduced = process_response(response)
             log_usage(query=query,hits=len(reduced))
             return reduced
@@ -174,7 +174,7 @@ class GetDocuments(Resource):
 
 def run_elastic_query(query,**kwargs):
     global es, ES_INDEX
-    return es.search(index=ES_INDEX,body=query,size=9999,**kwargs)
+    return es.search(index=ES_INDEX,body=query,**kwargs)
 
 
 def get_documents_status():
@@ -233,12 +233,13 @@ def customized_error_handler(e):
 
 
 parser = reqparse.RequestParser()
-parser.add_argument('from')
-parser.add_argument('id')
+parser.add_argument('key')
+parser.add_argument('language')
 
 api.add_resource(RootRequest, '/')
-api.add_resource(GetDocumentIds, '/ids')
+api.add_resource(GetLastUpdated, '/last-updated')
 api.add_resource(GetDocuments, '/documents')
+
 
 initialize(app)
 
