@@ -127,7 +127,7 @@ class RootRequest(Resource):
 
 
 class GetLastUpdated(Resource):
-    # @jwt_required()
+    @jwt_required()
     def get(self):
         global queries
         try:
@@ -141,7 +141,7 @@ class GetLastUpdated(Resource):
 
 
 class GetDocuments(Resource):
-    # @jwt_required()
+    @jwt_required()
     def get(self):
         global queries
         try:
