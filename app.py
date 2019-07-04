@@ -132,6 +132,7 @@ class GetLastUpdated(Resource):
     def get(self):
         global queries, available_languages
         try:
+            args = parser.parse_args()
             language = args['language']
             if not language:
                 language='nl'
