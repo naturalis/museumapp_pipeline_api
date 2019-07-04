@@ -16,6 +16,7 @@ ES_CONTROL_INDEX = None
 
 service_available = True
 logger = None
+available_languages = [ 'nl', 'en' ] 
 
 queries = {
     "all" : '{}',
@@ -129,8 +130,15 @@ class RootRequest(Resource):
 class GetLastUpdated(Resource):
     @jwt_required()
     def get(self):
-        global queries
+        global queries, available_languages
         try:
+            language = args['language']
+            if not language:
+                language='nl'
+
+            if not language in available_languages:
+                raise ValueError("unknown language '{}'".format(language))
+
             query = queries["all"]
             response = run_elastic_query(query,size=1,_source_includes="key,created")
             reduced = process_response(response)
@@ -143,7 +151,7 @@ class GetLastUpdated(Resource):
 class GetDocuments(Resource):
     @jwt_required()
     def get(self):
-        global queries
+        global queries, available_languages
         try:
             args = parser.parse_args()
             key = args['key']
@@ -154,7 +162,7 @@ class GetDocuments(Resource):
             if not language:
                 language='nl'
 
-            if not language in ['en','nl']:
+            if not language in available_languages:
                 raise ValueError("unknown language '{}'".format(language))
 
             if not key==None and not len(key)==0:
