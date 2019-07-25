@@ -21,7 +21,8 @@ available_languages = [ 'nl', 'en' ]
 queries = {
     "all" : '{{ "query": {{ "term" : {{ "language" : "{}" }}  }} }}',
     "key" : '{{ "query": {{ "term" : {{ "_key" : "{}" }}  }} }}',
-    "favourites" : '{{ "query": {{ "exists": {{ "field": "favourites_rank" }} }} }}'
+    "favourites" : '{{ "query": {{ "exists": {{ "field": "favourites_rank" }} }} }}',
+    "last_modified" : '{{ "query": {{ "term" : {{ "language" : "{}" }} }}, "size": 1, "sort": [ {{ "last_modified": {{ "order": "desc" }} }} ] }}'
 }
 
 def initialize(app):
@@ -141,11 +142,11 @@ class GetLastUpdated(Resource):
             if not language in available_languages:
                 raise ValueError("unknown language '{}'".format(language))
 
-            query = queries["all"].format(language)
+            query = queries["last_modified"].format(language)
 
-            response = run_elastic_query(query,size=1,_source_includes="created")
+            response = run_elastic_query(query,size=1,_source_includes="last_modified")
             reduced = process_response(response)
-            return { "last_update_date" : reduced["items"][0]["created"] }
+            return { "last_update_date" : reduced["items"][0]["last_modified"] }
         except Exception as e:
             log_request_error(str(e),query)
             return { "error": str(e) }
