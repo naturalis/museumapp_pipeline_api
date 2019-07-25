@@ -187,7 +187,7 @@ class GetFavourites(Resource):
         global queries
         try:
             query = queries["favourites"].format()
-            response = run_elastic_query(query,size=100,_source_includes="id,_key,favourites_rank")
+            response = run_elastic_query(query,size=100,_source_includes="_key,favourites_rank")
             reduced = process_favourites_response(response)
             log_usage(query=query,hits=len(reduced))
             return reduced
