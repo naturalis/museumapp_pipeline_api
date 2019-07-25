@@ -19,10 +19,9 @@ logger = None
 available_languages = [ 'nl', 'en' ] 
 
 queries = {
-    "all" : '{}',
-    "date_range" : '{{ "query": {{ "range" : {{ "created" : {{ "gte" : "{}" }} }} }} }}',
-    # "doc_id" : '{{ "query": {{ "match" : {{ "id" : {} }} }} }}'
-    "key" : '{{ "query": {{ "match_phrase": {{ "key": {} }} }} }}'
+    "all" : '{{ "query": {{ "term" : {{ "language" : "{}" }}  }} }}',
+    "key" : '{{ "query": {{ "term" : {{ "_key" : "{}" }}  }} }}',
+    "favourites" : '{{ "query": {{ "exists": {{ "field": "favourites_rank" }} }} }}'
 }
 
 def initialize(app):
@@ -132,6 +131,8 @@ class GetLastUpdated(Resource):
     def get(self):
         global queries, available_languages
         try:
+            query = ""
+
             args = parser.parse_args()
             language = args['language']
             if not language:
@@ -140,12 +141,13 @@ class GetLastUpdated(Resource):
             if not language in available_languages:
                 raise ValueError("unknown language '{}'".format(language))
 
-            query = queries["all"]
-            response = run_elastic_query(query,size=1,_source_includes="key,created")
+            query = queries["all"].format(language)
+
+            response = run_elastic_query(query,size=1,_source_includes="created")
             reduced = process_response(response)
             return { "last_update_date" : reduced["items"][0]["created"] }
         except Exception as e:
-            log_request_error(str(e))
+            log_request_error(str(e),query)
             return { "error": str(e) }
 
 
@@ -154,11 +156,10 @@ class GetDocuments(Resource):
     def get(self):
         global queries, available_languages
         try:
+            query = ""
+
             args = parser.parse_args()
             key = args['key']
-
-            # use language (nl,en) as filter in query 
-            # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-filter-context.html
             language = args['language']
             if not language:
                 language='nl'
@@ -167,17 +168,31 @@ class GetDocuments(Resource):
                 raise ValueError("unknown language '{}'".format(language))
 
             if not key==None and not len(key)==0:
-                key = json.dumps(key)
                 query = queries["key"].format(key)
             else:
-                query = queries["all"]
+                query = queries["all"].format(language)
 
             response = run_elastic_query(query,size=9999)
             reduced = process_response(response)
             log_usage(query=query,hits=len(reduced))
             return reduced
         except Exception as e:
-            log_request_error(str(e))
+            log_request_error(str(e),query)
+            return {"error": str(e) }
+
+
+class GetFavourites(Resource):
+    @jwt_required()
+    def get(self):
+        global queries
+        try:
+            query = queries["favourites"].format()
+            response = run_elastic_query(query,size=100,_source_includes="id,_key,favourites_rank")
+            reduced = process_favourites_response(response)
+            log_usage(query=query,hits=len(reduced))
+            return reduced
+        except Exception as e:
+            log_request_error(str(e),query)
             return {"error": str(e) }
 
 
@@ -205,15 +220,23 @@ def process_response(response):
     return { "size" : len(items), "items" : items }
 
 
+def process_favourites_response(response):
+    items=[]
+    for item in response["hits"]["hits"]:
+        items.append(item["_source"])
+
+    return items
+
+
 def log_usage(query,hits):
     global logger
     endpoint=request.path
     logger.info(json.dumps({ "endpoint" : endpoint, "query" : query, "hits" : hits }))
 
-def log_request_error(error):
+def log_request_error(error,query=""):
     global logger
     endpoint=request.path
-    logger.error(json.dumps({ "endpoint" : endpoint, "error" : error }))
+    logger.error(json.dumps({ "endpoint" : endpoint, "error" : error, "query" : query }))
 
 
 @app.before_request
@@ -248,6 +271,7 @@ parser.add_argument('language')
 api.add_resource(RootRequest, '/')
 api.add_resource(GetLastUpdated, '/last-updated')
 api.add_resource(GetDocuments, '/documents')
+api.add_resource(GetFavourites, '/favourites')
 
 
 initialize(app)
