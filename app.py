@@ -30,6 +30,7 @@ def initialize(app):
     initialize_users()
     initialize_elasticsearch()
 
+
 def initialize_logger(log_level=logging.INFO):
     global logger
 
@@ -50,6 +51,7 @@ def initialize_logger(log_level=logging.INFO):
         ch.setLevel(log_level)
         ch.setFormatter(formatter)
         logger.addHandler(ch)
+
 
 def initialize_users():
     global USERS, logger
@@ -79,23 +81,32 @@ def initialize_elasticsearch():
             ES_INDEX = os.getenv('ES_INDEX')
             ES_CONTROL_INDEX = os.getenv('ES_CONTROL_INDEX')
 
+        # es = Elasticsearch([{'host': os.getenv('ES_HOST'), 'port': os.getenv('ES_PORT')}],timeout=5)
+        # es.info()
+    except Exception as e:
+        logger.error("missing elasticsearch variables: {}".format(str(e)))
+        set_service_available(False)
+
+
+def get_elasticsearch_pulse():
+    global logger, es
+    try:
         es = Elasticsearch([{'host': os.getenv('ES_HOST'), 'port': os.getenv('ES_PORT')}])
         es.info()
+        set_service_available(True)
     except Exception as e:
         logger.error("elasticsearch unreachable: {}".format(str(e)))
         set_service_available(False)
 
 
-
 def set_service_available(state):
    global service_available
-   if service_available == True:
-        service_available = state
+   service_available = state
+
 
 def get_service_available():
    global service_available
    return service_available
-
 
 
 class User(object):
@@ -124,7 +135,6 @@ def identity(payload):
 class RootRequest(Resource):
     def get(self):
         return { "naturalis museumapp pipeline api" : "v1.0" }
-
 
 
 class GetLastUpdated(Resource):
@@ -158,7 +168,6 @@ class GetDocuments(Resource):
         global queries, available_languages
         try:
             query = ""
-
             args = parser.parse_args()
             key = args['key']
             language = args['language']
@@ -199,7 +208,7 @@ class GetFavourites(Resource):
 
 def run_elastic_query(query,**kwargs):
     global es, ES_INDEX
-    return es.search(index=ES_INDEX,body=query,**kwargs)
+    return es.search(index=ES_INDEX,body=query,request_timeout=5,**kwargs)
 
 
 def get_documents_status():
@@ -234,6 +243,7 @@ def log_usage(query,hits):
     endpoint=request.path
     logger.info(json.dumps({ "endpoint" : endpoint, "query" : query, "hits" : hits }))
 
+
 def log_request_error(error,query=""):
     global logger
     endpoint=request.path
@@ -242,6 +252,8 @@ def log_request_error(error,query=""):
 
 @app.before_request
 def PreRequestHandler():
+    get_elasticsearch_pulse()
+
     if not get_documents_status() == "ready":
         return jsonify({ "error": "document store busy" })
 

@@ -9,59 +9,100 @@ Voorbeelden in de tekst hieronder gebruiken `localhost`.
  - `/auth`: autorisatie / aanvraag token
  
 ## last-updated
-Het endpoint `/api/last-updated` geeft de meest recente wijzigingsdatum
+Het endpoint `/api/last-updated` geeft de meest recente wijzigingsdatum van een van de documenten. Optioneel kan een language-parameter wroden meegegeven die "en" en "nl" herkent. Zonder deze parameter default de service naar "nl":
 ```bash
-curl -X GET http://localhost:5000/api/ids 
+curl -X GET http://localhost:5000/api/last-updated?language=en
 ```
 Response
 ```json
+{"last_update_date": "2019-07-25T13:45:36+00:00"}
+```
+
+Let op:  `/api/last-updated`  vereist autorisatie (zie onder).
+
+## documents
+Via het endpoint `/api/documents` kan een lijst met JSON-documenten worden opgehaald. Optionele parameters zijn "language" (nl,en; default naar "nl") en "key". Met die laatste kan gericht een document worden opgevraagd op basis van de waarde van het document-veld "\_key". Zonder "key" worden alle documenten geretourneerd. Let op, "key" en "language" combineren op dit moment nog niet.
+```bash
+curl -X GET http://localhost:5000/api/documents
+curl -X GET http://localhost:5000/api/documents?language=en
+curl -X GET http://localhost:5000/api/documents?key=meles_meles
+```
+Response (ingekort)
+```json
 {
-    "size": 4,
-    "items": [
-        {
-            "created": "2019-01-01 12:34:56",
-            "id": 1
-        },
-        {
-            "created": "2019-03-01 12:34:56",
-            "id": 3
-        },
-        {
-            "created": "2019-02-01 12:34:56",
-            "id": 2
-        },
-        {
-            "created": "2019-04-01 12:34:56",
-            "id": 4
-        }
-    ]
+  "size": 1206,
+  "items": [
+    {
+      "id": 1,
+      "created": "2019-07-25T13:45:36+00:00",
+      "last_modified": "2019-07-25T13:45:36+00:00",
+      "language": "nl",
+      "_key": "meles_meles",
+      "favourites_rank": 3,
+      "header_image": {
+        "url": "http://145.136.242.65:8080/squared_images/RMNH.MAM.60099_1_SQUARED.jpg"
+      },
+      [...]
+    },
+    [...]
+  ]
 }
 ```
-Door middel van de parameter `from` kan de response worden beperkt tot documenten die zijn aangemaakt (= nieuw of sindsdien gewijzigd) na een bepaalde datum/tijd. Format is: `'%Y-%m-%dT%H:%M:%S`:
-```bash
-curl -X GET http://localhost:5000/api/ids?from=2019-03-01T23:23:23
-```
-Let op:  `/api/ids`  vereist autorisatie (zie onder).
-
-## Documenten
-Via het endpoint `/api/documents` kan een lijst met JSON-documenten worden opgehaald. Zonder parameter worden alle beschikbare ID's teruggegeven:
-```bash
-curl -X GET http://localhost:5000/api/documents 
-```
-Door middel van de parameter `from` kan de response worden beperkt tot documenten die zijn aangemaakt (= nieuw of sindsdien gewijzigd) na een bepaalde datum/tijd. Format is: `'%Y-%m-%dT%H:%M:%S`:
-```bash
-curl -X GET http://localhost:5000/api/documents?from=2019-03-01T23:23:23
-```
-Door middel van de parameter `id` kan een specifiek document worden opgevraagd:
-```bash
-curl -X GET http://localhost:5000/api/documents?id=2
-```
 Let op:  `/api/documents`  vereist autorisatie (zie onder).
+
+## favourites
+Het endpoint `/api/favourites` geeft een lijst met keys terug van de documenten die een waarde hebben in het veld "favourites_rank". Het endpoint is niet taalafhankelijk.
+```bash
+curl -X GET http://localhost:5000/api/favourites
+```
+Response
+```json
+[
+  {
+    "favourites_rank": 3,
+    "_key": "meles_meles"
+  },
+  {
+    "favourites_rank": 5,
+    "_key": "leopardus_tigrinus"
+  },
+  {
+    "favourites_rank": 9,
+    "_key": "loxodonta_africana"
+  },
+  {
+    "favourites_rank": 10,
+    "_key": "morus_bassanus"
+  },
+  {
+    "favourites_rank": 1,
+    "_key": "ursus_maritimus"
+  },
+  {
+    "favourites_rank": 6,
+    "_key": "carcharodon_carcharias"
+  },
+  {
+    "favourites_rank": 7,
+    "_key": "trichechus_manatus"
+  },
+  {
+    "favourites_rank": 4,
+    "_key": "gyps_fulvus"
+  },
+  {
+    "favourites_rank": 8,
+    "_key": "eudocimus_ruber"
+  }
+]
+
+```
+Let op:  `/api/favourites`  vereist autorisatie (zie onder).
 
 
 
 ## Autorisatie
-De endpoints `/api/ids` en `/api/documents` vereisen autorisatie door middel van  [JSON Web Tokens](https://jwt.io/). Aanvraag van een token gaat via het endpoint `/auth`:
+De endpoints vereisen autorisatie door middel van  [JSON Web Tokens](https://jwt.io/). Aanvraag van een token gaat via het endpoint `/auth`:
 ```bash
 curl -H "Content-Type: application/json" -X POST -d '{"username":"arthur","password":"dont_panic"}' http://localhost:5000/auth
 ```
