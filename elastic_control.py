@@ -134,6 +134,9 @@ class elasticsearch_control:
 
 
     def set_control_command(self,command):
+        if command == None:
+            return
+
         if command in [ "create_index", "delete_index", "load_documents", 
                         "delete_document", "delete_documents", "set_documents_status" ]:
             self.control_command = command

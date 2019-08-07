@@ -156,9 +156,10 @@ class GetLastUpdated(Resource):
 
             response = run_elastic_query(query,size=1,_source_includes="last_modified")
             reduced = process_response(response)
+            log_usage(language=language)
             return { "last_update_date" : reduced["items"][0]["last_modified"] }
         except Exception as e:
-            log_request_error(str(e),query)
+            log_request_error(str(e))
             return { "error": str(e) }
 
 
@@ -184,7 +185,7 @@ class GetDocuments(Resource):
 
             response = run_elastic_query(query,size=9999)
             reduced = process_response(response)
-            log_usage(query=query,hits=len(reduced))
+            log_usage(language=language,key=key,hits=len(reduced["items"]))
             return reduced
         except Exception as e:
             log_request_error(str(e),query)
@@ -199,10 +200,10 @@ class GetFavourites(Resource):
             query = queries["favourites"].format()
             response = run_elastic_query(query,size=100,_source_includes="_key,favourites_rank")
             reduced = process_favourites_response(response)
-            log_usage(query=query,hits=len(reduced))
+            log_usage(hits=len(response))
             return reduced
         except Exception as e:
-            log_request_error(str(e),query)
+            log_request_error(str(e))
             return {"error": str(e) }
 
 
@@ -238,16 +239,18 @@ def process_favourites_response(response):
     return items
 
 
-def log_usage(query,hits):
+def log_usage(language="",key="",hits=""):
     global logger
     endpoint=request.path
-    logger.info(json.dumps({ "endpoint" : endpoint, "query" : query, "hits" : hits }))
+    remote_addr=request.remote_addr
+    logger.info("{remote_addr} - {endpoint} - {params} - {hits}".format(remote_addr=remote_addr,endpoint=endpoint,params=json.dumps({"language":language,"key":key}),hits=hits))
 
 
-def log_request_error(error,query=""):
+def log_request_error(error="unknown error"):
     global logger
     endpoint=request.path
-    logger.error(json.dumps({ "endpoint" : endpoint, "error" : error, "query" : query }))
+    remote_addr=request.remote_addr
+    logger.error("{remote_addr} - {endpoint} - {query} - {error}".format(remote_addr=remote_addr,endpoint=endpoint,error=error))
 
 
 @app.before_request
