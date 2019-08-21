@@ -22,7 +22,9 @@ queries = {
     "all" : '{{ "query": {{ "term" : {{ "language" : "{}" }}  }} }}',
     "key" : '{{ "query": {{ "term" : {{ "_key" : "{}" }}  }} }}',
     "favourites" : '{{ "query": {{ "exists": {{ "field": "favourites_rank" }} }} }}',
-    "last_modified" : '{{ "query": {{ "term" : {{ "language" : "{}" }} }}, "size": 1, "sort": [ {{ "last_modified": {{ "order": "desc" }} }} ] }}'
+    "last_modified" : '{{ "query": {{ "term" : {{ "language" : "{}" }} }}, "size": 1, "sort": [ {{ "last_modified": {{ "order": "desc" }} }} ] }}',
+    "rooms" : '{{ "size":"0", "aggs" : {{ "museum_rooms" : {{ "terms" : {{ "field" : "objects.location.keyword" }} }} }} }}',
+    "by_room" : '{{ "query" : {{ "bool" : {{ "must": [{{ "match": {{ "objects.location.keyword": "{}" }} }}] }} }} }}'
 }
 
 def initialize(app):
@@ -168,24 +170,31 @@ class GetDocuments(Resource):
     def get(self):
         global queries, available_languages
         try:
-            query = ""
             args = parser.parse_args()
             key = args['key']
             language = args['language']
+            room = args['room']
+
             if not language:
                 language='nl'
 
             if not language in available_languages:
                 raise ValueError("unknown language '{}'".format(language))
 
+            query = ""
+
             if not key==None and not len(key)==0:
                 query = queries["key"].format(key)
+            elif not room==None and not len(room)==0:
+                if room=="-":
+                    room=""
+                query = queries["by_room"].format(room)
             else:
                 query = queries["all"].format(language)
 
             response = run_elastic_query(query,size=9999)
             reduced = process_response(response)
-            log_usage(language=language,key=key,hits=len(reduced["items"]))
+            log_usage(language=language,key=key,room=room,hits=len(reduced["items"]))
             return reduced
         except Exception as e:
             log_request_error(str(e),query)
@@ -201,6 +210,20 @@ class GetFavourites(Resource):
             response = run_elastic_query(query,size=100,_source_includes="_key,favourites_rank")
             reduced = process_favourites_response(response)
             log_usage(hits=len(response))
+            return reduced
+        except Exception as e:
+            log_request_error(str(e))
+            return {"error": str(e) }
+
+
+class GetRooms(Resource):
+    @jwt_required()
+    def get(self):
+        global queries
+        try:
+            query = queries["rooms"].format()
+            response = run_elastic_query(query)
+            reduced = process_rooms_response(response)
             return reduced
         except Exception as e:
             log_request_error(str(e))
@@ -239,11 +262,20 @@ def process_favourites_response(response):
     return items
 
 
-def log_usage(language="",key="",hits=""):
+def process_rooms_response(response):
+    items = {
+        "items" : response["aggregations"]["museum_rooms"]["buckets"],
+        "note" : "take note: 'doc_count' is the number of species with an object in the corresponding room, not the actual number of objects"
+        }
+    return items
+
+
+def log_usage(language="",key="",room="",hits=""):
     global logger
     endpoint=request.path
     remote_addr=request.remote_addr
-    logger.info("{remote_addr} - {endpoint} - {params} - {hits}".format(remote_addr=remote_addr,endpoint=endpoint,params=json.dumps({"language":language,"key":key}),hits=hits))
+    logger.info("{remote_addr} - {endpoint} - {params} - {hits}"
+        .format(remote_addr=remote_addr,endpoint=endpoint,params=json.dumps({"language":language,"key":key,"room":room}),hits=hits))
 
 
 def log_request_error(error="unknown error"):
@@ -283,11 +315,13 @@ def customized_error_handler(e):
 parser = reqparse.RequestParser()
 parser.add_argument('key')
 parser.add_argument('language')
+parser.add_argument('room')
 
 api.add_resource(RootRequest, '/')
 api.add_resource(GetLastUpdated, '/last-updated')
 api.add_resource(GetDocuments, '/documents')
 api.add_resource(GetFavourites, '/favourites')
+api.add_resource(GetRooms, '/rooms')
 
 
 initialize(app)

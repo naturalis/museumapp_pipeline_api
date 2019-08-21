@@ -137,7 +137,7 @@ class elasticsearch_control:
         if command == None:
             return
 
-        if command in [ "create_index", "delete_index", "load_documents", 
+        if command in [ "create_index", "delete_index", "delete_control_index", "load_documents", 
                         "delete_document", "delete_documents", "set_documents_status" ]:
             self.control_command = command
         else:
