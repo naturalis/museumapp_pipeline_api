@@ -282,7 +282,7 @@ def log_request_error(error="unknown error"):
     global logger
     endpoint=request.path
     remote_addr=request.remote_addr
-    logger.error("{remote_addr} - {endpoint} - {query} - {error}".format(remote_addr=remote_addr,endpoint=endpoint,error=error))
+    logger.error("{remote_addr} - {endpoint} - {error}".format(remote_addr=remote_addr,endpoint=endpoint,error=error))
 
 
 @app.before_request

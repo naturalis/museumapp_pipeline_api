@@ -1,3 +1,7 @@
 #!/bin/bash
 
-sudo docker build -t naturalis/museumapp_elastic_control:latest . -f Dockerfile-es_control; sudo docker login; sudo docker image push naturalis/museumapp_elastic_control:latest
+CONTAINER=naturalis/museumapp_elastic_control
+TAG=$1
+FILE=Dockerfile-es_control
+
+../_build.sh $CONTAINER $TAG $FILE

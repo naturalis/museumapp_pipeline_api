@@ -1,0 +1,11 @@
+{
+  "mappings": {
+    "properties": { 
+      "status":    { "type": "text"  }, 
+      "created":  {
+        "type":   "date", 
+        "format": "yyyy-MM-dd HH:mm:ss"
+      }
+    }
+  }
+}

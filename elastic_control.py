@@ -26,13 +26,12 @@ class elasticsearch_control:
 
 
     def initialize_logger(self,log_level=logging.INFO):
-        self.logfile_path=os.getenv('LOGFILE_PATH')
         self.logger=logging.getLogger("loader")
         self.logger.setLevel(log_level)
 
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-        fh = logging.FileHandler(self.logfile_path)
+        fh = logging.FileHandler(os.getenv('LOGFILE_PATH'))
         fh.setLevel(log_level)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
@@ -72,7 +71,7 @@ class elasticsearch_control:
         except:
             self.logger.error("elasticsearch unavailable")
 
- 
+
     def delete_index(self,index):
         try:
             result = self.es.indices.delete(index=index)
@@ -137,7 +136,7 @@ class elasticsearch_control:
         if command == None:
             return
 
-        if command in [ "create_index", "delete_index", "delete_control_index", "load_documents", 
+        if command in [ "create_index", "delete_index", "create_control_index", "delete_control_index", "load_documents", 
                         "delete_document", "delete_documents", "set_documents_status" ]:
             self.control_command = command
         else:
