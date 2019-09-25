@@ -13,7 +13,7 @@ Het endpoint `/api/last-updated` geeft de meest recente wijzigingsdatum van een 
 ```bash
 curl -X GET https://museumapp.naturalis.nl/api/last-updated?language=en
 ```
-Voorbeeldresponse
+Voorbeeldrespons
 ```json
 {"last_update_date": "2019-07-25T13:45:36+00:00"}
 ```
@@ -25,7 +25,7 @@ curl -X GET https://museumapp.naturalis.nl/api/documents
 curl -X GET https://museumapp.naturalis.nl/api/documents?language=en
 curl -X GET https://museumapp.naturalis.nl/api/documents?key=meles_meles
 ```
-Voorbeeldresponse (ingekort)
+Voorbeeldrespons (ingekort)
 ```json
 {
   "size": 1206,
@@ -52,7 +52,7 @@ Het endpoint `/api/favourites` geeft een lijst met keys terug van de documenten 
 ```bash
 curl -X GET https://museumapp.naturalis.nl/api/favourites
 ```
-Voorbeeldresponse
+Voorbeeldrespons
 ```json
 [
   {
@@ -100,7 +100,7 @@ Het endpoint `/api/rooms` geeft een lijst met museumzalen terug, met daarbij het
 ```bash
 curl -X GET https://museumapp.naturalis.nl/api/rooms
 ```
-Voorbeeldresponse
+Voorbeeldrespons
 ```json
 {
   "items": [
@@ -147,7 +147,7 @@ De endpoints vereisen autorisatie door middel van  [JSON Web Tokens](https://jwt
 ```bash
 curl -H "Content-Type: application/json" -X POST -d '{"username":"arthur","password":"dont_panic"}' https://museumapp.naturalis.nl/auth
 ```
-Voorbeeldresponse:
+Voorbeeldrespons:
 ```bash
 {
   "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1NTkzMTEwNDUsImlhdCI6MTU1OTMxMDc0NSwibmJmIjoxNTU5MzEwNzQ1LCJpZGVudGl0eSI6IjEifQ.BKpjIz-SeHPGXWrTcAbUwNwsOXxC8UMyjnxRFo8iRMA"
