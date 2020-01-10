@@ -111,7 +111,7 @@ class elasticsearch_control:
 
 
     def delete_document_by_id(self,doc_id):
-        result = self.es.delete(index=self.index_name, id=doc_id, refresh=True)
+        result = self.es.delete(index=self.index_name, id=doc_id, refresh=True, ignore=[400, 404])
         self.logger.info(json.dumps(result))
 
 
