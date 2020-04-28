@@ -6,10 +6,10 @@
  - `https://museumapp.naturalis.nl/api/documents`: documenten (één document correspondeert met één soortspagina in de app)
  - `https://museumapp.naturalis.nl/api/favourites`: lijst met favorieten
  - `https://museumapp.naturalis.nl/api/rooms`: lijst van museumzalen plus aantal documenten per zaal
- - `https://museumapp.naturalis.nl/auth`: autorisatie / aanvraag token
  - `https://museumapp.naturalis.nl/api/name-search`: zoeken op basis van soortnaam en populaire naam
  - `https://museumapp.naturalis.nl/api/key`: ophalen documenten op basis van document key
- 
+ - `https://museumapp.naturalis.nl/auth`: autorisatie / aanvraag token
+  
 ## _last-updated_
 Het endpoint `/api/last-updated` geeft de meest recente wijzigingsdatum van een van de documenten. Optioneel kan een language-parameter wroden meegegeven die "en" en "nl" herkent. Zonder deze parameter default de service naar "nl". Het endpoint vereist autorisatie (zie onder).
 ```bash
