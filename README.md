@@ -7,6 +7,8 @@
  - `https://museumapp.naturalis.nl/api/favourites`: lijst met favorieten
  - `https://museumapp.naturalis.nl/api/rooms`: lijst van museumzalen plus aantal documenten per zaal
  - `https://museumapp.naturalis.nl/auth`: autorisatie / aanvraag token
+ - `https://museumapp.naturalis.nl/api/name-search`: zoeken op basis van soortnaam en populaire naam
+ - `https://museumapp.naturalis.nl/api/key`: ophalen documenten op basis van document key
  
 ## _last-updated_
 Het endpoint `/api/last-updated` geeft de meest recente wijzigingsdatum van een van de documenten. Optioneel kan een language-parameter wroden meegegeven die "en" en "nl" herkent. Zonder deze parameter default de service naar "nl". Het endpoint vereist autorisatie (zie onder).
@@ -96,7 +98,7 @@ Voorbeeldrespons
 ```
 
 ## _rooms_
-Het endpoint `/api/rooms` geeft een lijst met museumzalen terug, met daarbij het aantal documenten per zaal. Het endpoint is niet taalafhankelijk.
+Het endpoint `/api/rooms` geeft een lijst met museumzalen terug, met daarbij het aantal documenten per zaal. Het endpoint is niet taalafhankelijk. Dit endpoint vereist autorisatie (zie onder).
 ```bash
 curl -X GET https://museumapp.naturalis.nl/api/rooms
 ```
@@ -140,6 +142,20 @@ Voorbeeldrespons
   "note": "take note: 'doc_count' is the number of species with an object in the corresponding room, not the actual number of objects"
 }
 
+```
+
+
+## _name-search_
+Het endpoint `/api/name-search` maakt zoeken naar documenten op basis van wetenschappelijke of populaire naam mogelijk. De API doet een match van de waarde in `search` op de velden `titles.main` (bevat de wetenschappelijke naam) en `titles.sub` (bevat de populaire naam). `titles.sub` is taalgevoelig (nl of en), maar zoeken gebeurt onafhankelijk van de taal. Let op: _match_ is de daadwerkelijk Elasticsearch match, dus hele delen van de zoektermen moeten matchen met hele delen van de veldwaarden. 'gier' vindt wel 'Vale gier', maar niet 'Monniksgier'. Dit endpoint vereist autorisatie (zie onder).
+```bash
+curl -X GET https://museumapp.naturalis.nl/api/name-search?search=gier
+```
+
+## _key_
+Het endpoint `/api/key` haalt documenten op op basis van de `key`. De key van de documenten wordt afgeleid van de wetenschappelijke naam volgens: `Aegypius monachus` => `aegypius_monachus`. Zoeken kan zowel op de letterlijke key, als op wetenschappelijke naam. In dat laatste geval past de API dezelfde transformatie toe op de de zoekterm. `key` is taalonafhankelijk; als er voor een gevraagde key documenten in verschillende talen beschikbaar zijn, worden die allemaal geretourneerd. Dit endpoint vereist autorisatie (zie onder).
+```bash
+curl -X GET https://museumapp.naturalis.nl/api/key?name=aegypius_monachus
+curl -X GET https://museumapp.naturalis.nl/api/key?name=Aegypius%20monachus
 ```
 
 ## Autorisatie
