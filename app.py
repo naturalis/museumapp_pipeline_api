@@ -24,7 +24,8 @@ queries = {
     "favourites" : '{{ "query": {{ "exists": {{ "field": "favourites_rank" }} }} }}',
     "last_modified" : '{{ "query": {{ "term" : {{ "language" : "{}" }} }}, "size": 1, "sort": [ {{ "last_modified": {{ "order": "desc" }} }} ] }}',
     "rooms" : '{{ "size":"0", "aggs" : {{ "museum_rooms" : {{ "terms" : {{ "field" : "objects.location.keyword" }} }} }} }}',
-    "by_room" : '{{ "query" : {{ "bool" : {{ "must": [{{ "match": {{ "objects.location.keyword": "{}" }} }}] }} }} }}'
+    "by_room" : '{{ "query" : {{ "bool" : {{ "must": [{{ "match": {{ "objects.location.keyword": "{}" }} }}] }} }} }}',
+    "search" : '{{ "query": {{ "multi_match" : {{ "query": "{}", "fields": [ "titles.main", "titles.sub" ] }} }} }}'
 }
 
 def initialize(app):
@@ -128,10 +129,10 @@ def verify(username, password):
         if user['username'] == username and user['password'] == password:
             return User(id=user['userid'])
 
+
 def identity(payload):
     user_id = payload['identity']
     return {"user_id": user_id}
-
 
 
 class RootRequest(Resource):
@@ -200,6 +201,40 @@ class GetDocuments(Resource):
             log_request_error(str(e),query)
             return {"error": str(e) }
 
+
+class SearchNames(Resource):
+    @jwt_required()
+    def get(self):
+        global queries
+        try:
+            args = parser.parse_args()
+            search = args['search']
+            query = queries["search"].format(search)
+            response = run_elastic_query(query,size=9999)
+            reduced = process_response(response)
+            log_usage(search=search,hits=len(reduced["items"]))
+            return reduced
+        except Exception as e:
+            log_request_error(str(e),query)
+            return {"error": str(e) }
+
+
+class GetKeyByName(Resource):
+    @jwt_required()
+    def get(self):
+        global queries
+        try:
+            args = parser.parse_args()
+            search = args['name']
+            search = search.strip().lower().replace(" ", "_")
+            query = queries["key"].format(search)
+            response = run_elastic_query(query,size=9999)
+            reduced = process_response(response)
+            log_usage(search=search,hits=len(reduced["items"]))
+            return reduced
+        except Exception as e:
+            log_request_error(str(e),query)
+            return {"error": str(e) }
 
 class GetFavourites(Resource):
     @jwt_required()
@@ -270,12 +305,12 @@ def process_rooms_response(response):
     return items
 
 
-def log_usage(language="",key="",room="",hits=""):
+def log_usage(language="",key="",room="",hits="",search=""):
     global logger
     endpoint=request.path
     remote_addr=request.remote_addr
     logger.info("{remote_addr} - {endpoint} - {params} - {hits}"
-        .format(remote_addr=remote_addr,endpoint=endpoint,params=json.dumps({"language":language,"key":key,"room":room}),hits=hits))
+        .format(remote_addr=remote_addr,endpoint=endpoint,params=json.dumps({"language":language,"key":key,"room":room,"search":search}),hits=hits))
 
 
 def log_request_error(error="unknown error"):
@@ -316,12 +351,16 @@ parser = reqparse.RequestParser()
 parser.add_argument('key')
 parser.add_argument('language')
 parser.add_argument('room')
+parser.add_argument('search')
+parser.add_argument('name')
 
 api.add_resource(RootRequest, '/')
 api.add_resource(GetLastUpdated, '/last-updated')
 api.add_resource(GetDocuments, '/documents')
 api.add_resource(GetFavourites, '/favourites')
 api.add_resource(GetRooms, '/rooms')
+api.add_resource(SearchNames, '/name-search')
+api.add_resource(GetKeyByName, '/key')
 
 
 initialize(app)
